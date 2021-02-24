@@ -1,6 +1,6 @@
 # Building an Application with Spring Boot
 
-이 문서 [다음 문서](https://spring.io/guides/gs/spring-boot/)를 실습하는 내용이다.
+이 문서 [다음 문서](https://spring.io/guides/gs/spring-boot/)를 실습하는 내용이다. 영어를 해석에 문제가 많으니 유의바란다.
 
 
 
@@ -170,7 +170,7 @@ pom.xml을 보게 되면 위와같은 부분이 있는데 이 부분이 테스�
 
 이제 간단한 유닛 테스트를 작성해보자. 
 
-우리의 endpoint에 대 servlet request, response를 mock 해주는 테스트를 아래와 같이 작성한다.
+우리의 endpoint에 대해 servlet request, response를 mock 해주는 테스트를 아래와 같이 작성한다.
 
 
 
@@ -271,3 +271,114 @@ public class HelloControllerIT {
 
 ![image-20210223221435343](README.assets/image-20210223221435343.png)
 
+
+
+## Product 등급의 서비스 추가
+
+만약 비지니스를 위한 웹사이트를 만드는 중이라면 아마도 관리 서비스를 추가할 필요가 있을 것이다. 스프링 부트는 그런 몇가지의 서비스를  actuator module과 함께 제공해준다. (예를들면 서비스의 상태나 감사, 빈즈 같은 것들) 
+
+
+
+```xml
+<dependency>
+	<groupId>org.springframework.boot</groupId>
+	<artifactId>spring-boot-starter-actuator</artifactId>
+</dependency>
+```
+
+위와같은 의존성을 pom.xml에 추가해주자.
+
+그리고 어플리케이션을 재시작해보자.
+
+```
+./mvnw spring-boot:run
+```
+
+새로운 RESTful endpoint가 어플리케이션에 추가됨을 확인해보자.  이것들은 스프링 부트가 제공해주는 관리 서비스들이다. 아래와 같은 리스트는 전형적인 결과를 보여준다
+
+
+
+```
+management.endpoint.configprops-org.springframework.boot.actuate.autoconfigure.context.properties.ConfigurationPropertiesReportEndpointProperties
+management.endpoint.env-org.springframework.boot.actuate.autoconfigure.env.EnvironmentEndpointProperties
+management.endpoint.health-org.springframework.boot.actuate.autoconfigure.health.HealthEndpointProperties
+management.endpoint.logfile-org.springframework.boot.actuate.autoconfigure.logging.LogFileWebEndpointProperties
+management.endpoints.jmx-org.springframework.boot.actuate.autoconfigure.endpoint.jmx.JmxEndpointProperties
+management.endpoints.web-org.springframework.boot.actuate.autoconfigure.endpoint.web.WebEndpointProperties
+management.endpoints.web.cors-org.springframework.boot.actuate.autoconfigure.endpoint.web.CorsEndpointProperties
+management.health.status-org.springframework.boot.actuate.autoconfigure.health.HealthIndicatorProperties
+management.info-org.springframework.boot.actuate.autoconfigure.info.InfoContributorProperties
+management.metrics-org.springframework.boot.actuate.autoconfigure.metrics.MetricsProperties
+management.metrics.export.simple-org.springframework.boot.actuate.autoconfigure.metrics.export.simple.SimpleProperties
+management.server-org.springframework.boot.actuate.autoconfigure.web.server.ManagementServerProperties
+management.trace.http-org.springframework.boot.actuate.autoconfigure.trace.http.HttpTraceProperties
+```
+
+actuator는 다음 3가지를 노출한다.
+
+* actuator/health
+* actuator/info
+* actuator
+
+
+
+다음과 같은 요청을 보내면 위에 추가된 actuator를 확인할 수 있다.
+
+![image-20210224233814911](README.assets/image-20210224233814911.png)
+
+![image-20210224234006609](README.assets/image-20210224234006609.png)
+
+
+
+그리고 /actuator/shutdown 엔드포인트도 있는데 이걸 활성화 하려면 application.properties 파일에 다음과 같은 문구를 추가해줘야한다.
+
+```properties
+management.endpoint.shutdown.enabled=true
+management.endpoints.web.exposure.include=health,info,shutdown
+```
+
+설정을 추가해주면 아래와 같이 Not Found가 Method Not Allowed로 바뀐다.
+
+![image-20210224234554613](README.assets/image-20210224234554613.png)
+
+아래와 같이 포스트 메서드로 shutdown 요청을 보내면 해당 문구와 함께 어플리케이션이 종료된다.
+
+![image-20210224234653661](README.assets/image-20210224234653661.png)
+
+
+
+actuator에 대한 내용은 [다음](https://docs.spring.io/spring-boot/docs/2.4.2/reference/htmlsingle/#production-ready-endpoints)링크에서 종류를 확인할 수 있다. 다른 여러 명령어들은 웹환경에서는 안되고 JMX라는 것을 이용해야한다.
+
+웹에 대해서도 허용해주려면 아래와 같은 설정을 해주면 된다고한다.
+
+![image-20210224235420377](README.assets/image-20210224235420377.png)
+
+
+
+Application.properties 파일에 아래 설정을 추가해보았다.
+
+```
+management.endpoints.web.exposure.include=*
+```
+
+그랬더니 Not Found 였던 env에 대한 actuator 요청이 작동하는걸 볼 수 있었다.
+
+![image-20210224235548505](README.assets/image-20210224235548505.png)
+
+근데 너무 읽기 힘든 형태였따..  여기까지만 해보자.
+
+
+
+## 느낀점
+
+뭔가 띄엄띄엄 있는 정보들을 수박 겉햛기 식으로 본듯 하다.
+
+@RestController와 @RequestMapping을 통해 간단하게 RESTful API를 정의해보았고 CommandLineRunner를 통해 어플리케이션 시작후 스프링 부트가 자동으로 추가한 모든 빈의 이름을 출력해보기도 하였다.
+
+그리고 단위 테스트를 진행하기위해 @SpringBootTest, @AutoConfigureMockMvc를 이용해 목 서블릿으로 요청과 응답을 테스트 해보았다. MockMvc를 @Autowired를 통해 주입받고 perform 메서드로 MockMvcRequestBuilders에 지정된 결과값을 비교해보았다. 이때 @SpringBootTest 는 모든 application context를 생성하는데 @WebMvcTest 를 쓰면 웹 레이어에 대한 application context만 생성한다고 한다. 그리고 단위 테스트가 아닌 full-stack 통합 테스트를 진행할 수도있었다. @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT) 와 같이 어노테이션에 webEnvironment 를 설정해주면 내장 톰켓이 랜덤 포트에 시작되고 테스트 되는 것을 보았다. 생성된 서버의 포트를 받아와 요청을 보낼 URL을 만들고 테스트 요청을 보내 결과를 가져와 비교해보았다.
+
+TestRestTemplate을 @Autowired를 통해 주입받고 그를 이용해 요청을 받을 수 있었다. 
+
+
+
+그리고 Product 등급의 서비스를 손쉽게 추가할 수 있었다. actuator를 의존성에 추가하고 적절한 설정을 해주면 어플리케이션의 상태를 보거나 종료하는등의 다양한 endpoint를 자동으로 만들어 주었다.
