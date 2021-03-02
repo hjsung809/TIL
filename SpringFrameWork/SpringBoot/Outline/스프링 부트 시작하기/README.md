@@ -150,7 +150,7 @@ static 폴더는 HTML과 같은 정적인 웹 리소스가 저장되고, templat
 </project>
 ```
 
-Pom.xml 파일이 기본적으로 제공되는데, 가장 중요한 설정은 의존 관계에 해당하는 <dependencies> 설정이다.
+Pom.xml 파일이 기본적으로 제공되는데, 가장 중요한 설정은 의존 관계에 해당하는 \<dependencies\> 설정이다.
 
 - Spring-boot-starter-web
 
@@ -184,3 +184,221 @@ spring.main.web-application-type=none
 
 
 
+## 배너 변경하기
+
+스프링 부트로 만든 애플리케이션을 실행보면 기본 배너가 출력된다.
+
+![image-20210301103250007](무제.assets/image-20210301103250007.png)
+
+이 배너를 변경해 보자.
+
+
+
+### 배너 제거
+
+일단 배너를 제거하려면 아래 코드와 같이 작성하면된다.
+
+```java
+public static void main(String[] args) {
+		SpringApplication app = new SpringApplication(DemoAppApplication.class);
+//		SpringApplication.run(DemoAppApplication.class, args);
+		app.setBannerMode(Banner.Mode.OFF);
+		app.run(args);
+	}
+```
+
+
+
+### 배너 변경
+
+이번에는 src/main/resources 폴더 아래에 'banner.txt'파일을 만들어보자.
+
+![image-20210301103928662](무제.assets/image-20210301103928662.png)
+
+그리고 
+
+```java
+
+	public static void main(String[] args) {
+		SpringApplication app = new SpringApplication(DemoAppApplication.class);
+//		SpringApplication.run(DemoAppApplication.class, args);
+//		app.setBannerMode(Banner.Mode.OFF);
+		app.run(args);
+	}
+```
+
+배너 모드를 끄는 부분을 주석처리한다.
+
+![image-20210301104012942](무제.assets/image-20210301104012942.png)
+
+그럼 이제 스프링 부트 시작시 내가 만든 배너가 출력되는 것을 볼 수 있다.
+
+
+
+![image-20210301104138485](무제.assets/image-20210301104138485.png)
+
+위와 같이 ${spring-boot.formatted-version} 변수를 추가해주면,
+
+![image-20210301104219503](무제.assets/image-20210301104219503.png)
+
+실행시 위와 같이 버전 정보를 출력할 수 있다.
+
+
+
+### 배너 파일 위치 변경
+
+![image-20210301104351636](무제.assets/image-20210301104351636.png)
+
+위와 같이 banner 폴더를 생성하고 banner.txt를 옮겨보자.
+
+```properties
+spring.banner.location=banner/banner.txt
+```
+
+그리고, 위 내용을 application.properties 파일에 추가한다. 실행시, 원래대로 작동하는걸 볼 수 있다.
+
+여기서 경로를 src/main/resources 를 기준으로 상대경로로 입력함을 주의하자.
+
+
+
+## 톰캣 서버 포트 변경하기
+
+톰캣 서버의 포트를 변경해보자. application.properties 파일에 아래 내용을 추가하자.
+
+```properties
+spring.main.web-application-type=servlet
+server.port=8000
+```
+
+실행시 아래와 같이 포트가 8000번으로 변경됨을 볼 수 있따.
+
+
+
+![image-20210301104848062](무제.assets/image-20210301104848062.png)
+
+만약 포트번호를 0으로 설정하면 현재 사용되지 않는 포트 번호가 랜덤으로 할당된다.
+
+아래는 0으로 설정후 실행했을때 랜덤한 포트번호인 52737 번으로 서버가 실행된 것을 볼 수 있다.
+
+![image-20210301104936282](무제.assets/image-20210301104936282.png)
+
+
+
+
+
+application.properties에 작성된 server.port=8000 부분에 마우스를 올려놓고 ctrl(혹은 command) 키를 눌러 클릭하면 ServerProperties 클래스로 이동하고, setPort() 메소드가 선택된다. server 라는 접두사로 시작하는 프로퍼티를 설정하는 것이 내부적으로는 ServerProperties 객체의 수정자 메소드 호출로 연결된다.
+
+![image-20210301105313271](무제.assets/image-20210301105313271.png)
+
+
+
+## 웹 어플리케이션 작성하기
+
+```java
+package com.example.demoapp;
+
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RestController;
+
+@RestController
+public class HelloController {
+	public HelloController() {
+		System.out.println("==> HelloController 생성");
+	}
+	
+	@RequestMapping("/hello")
+	public String hello(String name) {
+		return "Hello " + name;
+	}
+
+}
+```
+
+위와 같이 src/main/java 에 클래스를 추가한다. 
+
+@Controller  어노테이션 대신 스프링 4부터 지원하는 @RestController를 사용한다. @RestController를 사용하면 REST 방식의 응답을 처리하는 컨트롤러를 구현할 수 있다. @Controller 를 사용하면 hello 메소드의 리턴 타입으로 문자열을 사용했을 때, 문자열에 해당하는 View를 만들어야 한다. 하지만 @RestController 로 등록하면 리턴되는 문자열이 브라우저에 그대로 출력되기 떄문에 별도로 View 화면을 만들 필요가 없다.
+
+@GetMapping은 기존의 @RequestMapping(value="hello", method=RequestMethod.GET)과 동일한 어노테이션이다.
+
+![image-20210301111124128](무제.assets/image-20210301111124128.png)
+
+name에 내이름을 담아서 보내면 위와 같은 결과를 볼 수 있다.
+
+![image-20210301111328704](무제.assets/image-20210301111328704.png)
+
+실행 되는 콘솔을 보면 HelloController 객체가 생성되는 것을 볼 수 있다. 요청을 반복적으로 보내도 HelloController 는 처음 실행시에만 생성되는 것을 확인할 수 있다.
+
+
+
+### 자동 컴포넌트 스캔
+
+스프링 문법에 따르면 @RestController를 설정했다 하더라도, XML 설정 파일에 \<context:component-scan\> 을 설정하지 않으면 컨테이너가 컨트롤러를 빈으로 등록하지 않는다. 하지만 스프링 부트에서는 컴포넌트 스캔이 자동으로 처리된다. 
+
+비밀은 @SpringBootApllication 어노테이션에 있다.
+
+![image-20210301111917424](무제.assets/image-20210301111917424.png)
+
+@SpringBootApplication이 포함하는 어노테이션은 매우 다양한데, 그중 @ComponentScan어노테이션은 메인 클래스가 속해 있는 패키지를 베이스 패키지로 하여 빈 등록을 처리한다. 즉, XML 설정 파일에 \<context:component-scan base-package="해당 패키지 이름"\> 로 설정한 것과 동일하게 동작한다. 루트 패키지가 아닌 다른 패키지에 클래스를 작성하면 스프링 컨테이너는 해당 클래스를 빈으로 등록하지 않게 됨으로 주의해야한다.
+
+만약 메인 패키지가 아닌 다른 패키지를 등록하고 싶다면 메인 클래스에 @ComponentScan(basePackages={"메인 패키지", "다른 패키지"}) 어노테이션을 붙여아한다.
+
+
+
+### REST 컨트롤러 사용하기
+
+@RestController는 JSP 같은 뷰를 별도로 만들지 않는 대신에 컨트롤러 메소드가 리턴한 데이터 자체를 클라이언트로 전달한다. 클라이언트로 전달되는 데이터는 대부분 문자열이거나 VO(Value Object)나 컬렉션 형태의 자바객체인데 자바 객체가 전달되는 경우에는 자동으로 JSON으로 변환하여 처리하게 된다.
+
+
+
+### 스프링 DevTools 사용하기
+
+새로운 변경사항이 있으면 반드시 실행중인 애플리케이션을 중지한 뒤 애플리케이션을 재실행 해야한다. 그래야 수정사항이 반영되기 때문이다. 매번 애플리케이션을 재실행하는 것이 귀찮으면 스프링 부트가 제공하는 DevTools 기능을 이용하면된다.
+
+pom.xml 을열고 의존성을 추가해보자.
+
+![image-20210301115653709](무제.assets/image-20210301115653709.png)
+
+Dependency 에서 자동완성 기능을 누르고 Add Starters 메뉴를 선택한다.
+
+![image-20210301120326576](무제.assets/image-20210301120326576.png)
+
+Spring Boot DevTools 를 추가해주면 pom.xml에 아래와 같은 내용이 추가된 것을 볼 수 있다.
+
+![image-20210301120436105](무제.assets/image-20210301120436105.png)
+
+
+
+
+
+이제 내용을 수정하면 자동으로 적용되는 것을 볼 수 있다.
+
+
+
+## 롬복 라이브러리 사용하기
+
+웹 애플리케이션에서 사용하는 VO(Value Object) 클래스는 일반적으로 테이블의 칼럼 이름과 동일한 private 멤버 변수를 가진다. 그리고 그에 접근하기 위한 public Setter,Getter 메서드가 필요하고, toString() 메소드를 재정의 해줘야한다. 이런 메소드들은 이클립스의 단축키 Alt + Shift + S 를 이용하여 쉽게 생성할 수 있다.
+
+하지만 소스가 너무 지저분해지고 모든 VO 클래스와 JPA에 사용할 도메인 클래스에 이런 메소드를 반복적으로 작성하는 것은 귀찮은 일이다. 이런 문제를 간단하게 해결할 수 있는 것이 롬복(Loombok)이다. 롬복을 사용하면 자바 파일을 컴파일할때 자동으로 생성자와 Getter 및 Setter, toString() 메서드를 자동으로 추가해준다.
+
+
+
+```java
+package com.example.demoapp;
+
+import java.util.Date;
+
+import lombok.Getter;
+
+@Getter
+public class TestVO {
+	private int seq;
+	private String title;
+	private Date createDate = new Date();
+}
+```
+
+Lombok 을 설치하고 나서, 위와 같은 TestVO 클래스를 만들고, @Getter 어노테이션을 만들어준 다음 프로젝 익스플로러를 열어보면 아래와 같이 Getter 메서드가 추가된 것을 볼 수 있다.
+
+![image-20210302100015133](무제.assets/image-20210302100015133.png)
+
+이 외에도 @Setter, @ToString, @Data 등의 어노테이션도 사용할 수 있다. @Data의 경우 @Getter,@Setter를 비롯한 모든 어노테이션을 포함하기때문에 매우 유용하게 사용할 수 있다.
