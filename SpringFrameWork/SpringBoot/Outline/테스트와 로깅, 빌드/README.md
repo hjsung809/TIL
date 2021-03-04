@@ -398,3 +398,356 @@ MockMvcResultMatchers 객체가 제공하는 검증 메소드를 알아보자.
 
 ## 내장 톰켓으로 테스트하기
 
+서블릿 컨테이너를 구동하고 테스트 결과를 확인하고 싶다면 @SpringBootTest에서 webEnviroment 속성 값을 RANDOM_PORT나 DEFINED_PORT로 변경하면 된다. @AutoConfigureMockMvc는 빼도 된다.
+
+```java
+package com.hojun.chap3;
+
+
+import static org.junit.jupiter.api.Assertions.assertEquals;
+//import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+//import static org.springframework.test.web.servlet.result.MockMvcResultHandlers.print;
+//import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
+//import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+
+import org.junit.jupiter.api.Test;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
+import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.boot.test.context.SpringBootTest.WebEnvironment;
+import org.springframework.boot.test.web.client.TestRestTemplate;
+//import org.springframework.test.web.servlet.MockMvc;
+
+@SpringBootTest(webEnvironment = WebEnvironment.RANDOM_PORT)
+public class HelloControllerTest {
+//	@Autowired
+//	private MockMvc mvc;
+	
+	@Autowired
+	private TestRestTemplate restTemplate;
+	
+	@Test
+	public void testHello() throws Exception {
+//		mvc.perform(get("/hello").param("name", "둘리"))
+//			.andExpect(status().isOk())
+//			.andExpect(content().string("Hello 둘리!!"))
+//			.andDo(print());
+		String result = restTemplate.getForObject("/hello?name=둘리", String.class);
+		assertEquals("Hello 둘리!!", result);
+	}
+}
+```
+
+위와 같이 RANDOM_PORT로 변경하면 내장 톰캣을 구동하고 정상적으로 서블릿 컨테이너를 사용한다. DEFINED_PORT는 application.properties에 server.port 프로퍼티를 사용한다. 없으면 랜덤하게 한다.
+
+서블릿 컨테이너를 모킹하지 않기 때문에 MockMvc 객체를 목업할 수 없다. 따라서 TestRestTemplate을 주입받아야 한다.
+
+getForObject()메서드에 URL을 첫번째 인자로 전달하고 응답 결과 타입을 두번째 인자로 지정한다. 그리고 assertEquals() 메소드로 응답 결과 메시지를 검증한다. getForObject()에 다른 객체도 사용할수 있다. 
+
+
+
+## 서비스 계층과 연동된 컨트롤러 테스트
+
+### 비지니스 컴포넌트 사용
+
+실제 프로젝트에서 컨트롤러는 단순히 사용자의 요청을 받아들이는 역할만 한다. 사용자가 원하는 비지니스 로직을 처리하기 위해서는 비지니스 컴포넌트를 호출해야한다. 비지니스 컴포넌트를 개발할 때는 컴포넌트를 사용할 클라이언트에게 제공할 인터페이스를 먼저 만들고 인터페이스를 구현할 구현 클래스를 작성해야한다.
+
+
+
+먼저 서비스 인터페이스를 정의한다.
+
+```java
+package com.hojun.chap3.service;
+
+import java.util.List;
+
+import com.hojun.chap3.BoardVO;
+
+public interface BoardService {
+	String hello(String name);
+	BoardVO getBoard();
+	List<BoardVO> getBoardList();
+}
+```
+
+그리고 인터페이스를 구현하는 구현 클래스를 만든다.
+
+```java
+package com.hojun.chap3.service;
+
+import java.util.ArrayList;
+import java.util.Date;
+import java.util.List;
+
+import org.springframework.stereotype.Service;
+
+import com.hojun.chap3.BoardVO;
+
+@Service
+public class BoardServiceImpl implements BoardService {
+
+	@Override
+	public String hello(String name) {
+		// TODO Auto-generated method stub
+		return "Hello " + name + "!!";
+	}
+
+	@Override
+	public BoardVO getBoard() {
+		// TODO Auto-generated method stub
+		BoardVO board= new BoardVO();
+		board.setSeq(1);
+		board.setCreateDate(new Date());
+		board.setTitle("테스트 제목");
+		return board;
+	}
+
+	@Override
+	public List<BoardVO> getBoardList() {
+		// TODO Auto-generated method stub
+		List<BoardVO> boardList = new ArrayList<BoardVO>();
+		for(int i = 1 ; i <= 10; i++) {
+			BoardVO board= new BoardVO();
+			board.setSeq(i);
+			board.setCreateDate(new Date());
+			board.setTitle("테스트 제목 " + i);
+		}
+		return boardList;
+	}
+
+}
+```
+
+
+
+그리고 컨트롤러에서 서비스를 주입받아 요청에 따라 서비스가 제공해주는 객체를 리턴해준다.
+
+```java
+package com.hojun.chap3.controller;
+
+import java.util.List;
+
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RestController;
+
+import com.hojun.chap3.BoardVO;
+import com.hojun.chap3.service.BoardService;
+import com.hojun.chap3.service.BoardServiceImpl;
+
+@RestController
+public class BoardController {
+	
+	@Autowired
+	BoardService boardService;
+	
+	public BoardController() {
+		System.out.println("==> BoardController 생성");
+	}
+	
+	@GetMapping("/hello")
+	public String hello(String name) {
+		return "Hello " + name + "!!";
+	}
+	@GetMapping("/getBoard")
+	public BoardVO getBoard() {
+		return boardService.getBoard();
+	}
+	@GetMapping("/getBoardList")
+	public List<BoardVO> getBoardList() {
+		return boardService.getBoardList();
+	}
+
+}
+```
+
+그리고 아래 테스트를 실행하면 성공한다.
+
+
+
+```java
+package com.hojun.chap3;
+
+
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import java.util.List;
+
+import org.junit.jupiter.api.Test;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.boot.test.context.SpringBootTest.WebEnvironment;
+import org.springframework.boot.test.web.client.TestRestTemplate;
+
+@SpringBootTest(webEnvironment = WebEnvironment.RANDOM_PORT)
+public class BoardControllerTest {
+	
+	@Autowired
+	private TestRestTemplate restTemplate;
+	
+	@Test
+	public void testHello() throws Exception {
+		String result = restTemplate.getForObject("/hello?name=둘리", String.class);
+		assertEquals("Hello 둘리!!", result);
+	}
+	
+	@Test
+	public void testGetBoard() throws Exception {
+		BoardVO result = restTemplate.getForObject("/getBoard", BoardVO.class);
+		assertEquals("테스트 제목", result.getTitle());
+	}
+	
+	@Test
+	public void testGetBoardList() throws Exception {
+		List<BoardVO> result = restTemplate.getForObject("/getBoardList", List.class);
+		assertEquals(10, result.size());
+	}
+}
+
+```
+
+
+
+
+
+### 비지니스 컴포넌트 모킹하기
+
+@SpringBootTest(webEnvironment = WebEnvironment.RANDOM_PORT) 와 @AutoConfigureMockMvc 를 이용하면 서비스 빈까지 모두 만드는데, 생성하는데 많은 시간과 자원이 필요하거나 아직 완성이 되지 않은 경우 곤란할 수 있다.
+
+이떄를 대비하며 비지니스 컴포넌트를 모킹해서 테스트할 수 있다.
+
+
+
+```java
+package com.hojun.chap3;
+
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.result.MockMvcResultHandlers.print;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+
+import org.junit.jupiter.api.Test;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
+import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.boot.test.context.SpringBootTest.WebEnvironment;
+import org.springframework.boot.test.mock.mockito.MockBean;
+import org.springframework.test.web.servlet.MockMvc;
+
+import com.hojun.chap3.service.BoardService;
+
+@SpringBootTest(webEnvironment = WebEnvironment.MOCK)
+@AutoConfigureMockMvc
+public class BoardControllerTest2 {
+	
+	@Autowired
+	private MockMvc mockMvc;
+	
+	@MockBean
+	private BoardService boardService;
+	
+	@Test
+	public void testHello() throws Exception {
+		mockMvc.perform(get("/hello").param("name", "둘리"))
+		.andExpect(status().isOk())
+		.andExpect(content().string("Hello 둘리!!"))
+		.andDo(print());
+	}
+	
+}
+
+```
+
+MockMvc를 사용하기 위해서는 @AutoConfigureMockMvc 어노테이션이 필요하다. @MockBean을 이용해서 BoardService 타입의 객체를 사용하고 있는데, @MockBean은 특정 타입의 객체를 모킹할 수 있기때문에 비지니스 객체(BoardServiceImpl)을 생성하지 않고도 테스트 케이스를 사용할 수 있다.
+
+
+
+```java
+package com.hojun.chap3;
+
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.result.MockMvcResultHandlers.print;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+
+import java.nio.charset.Charset;
+import java.nio.charset.CharsetDecoder;
+import java.nio.charset.CharsetEncoder;
+import java.nio.charset.StandardCharsets;
+import java.util.List;
+
+import org.junit.jupiter.api.Test;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
+import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.boot.test.context.SpringBootTest.WebEnvironment;
+import org.springframework.boot.test.mock.mockito.MockBean;
+import org.springframework.http.MediaType;
+import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.test.web.servlet.ResultActions;
+
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.hojun.chap3.service.BoardService;
+
+@SpringBootTest(webEnvironment = WebEnvironment.MOCK)
+@AutoConfigureMockMvc
+public class BoardControllerTest2 {
+	
+	@Autowired
+	private MockMvc mockMvc;
+	
+	@Autowired
+	private ObjectMapper objectMapper;
+	
+	@MockBean
+	private BoardService boardService;
+	
+	@Test
+	public void testHello() throws Exception {
+		mockMvc.perform(get("/hello").param("name", "둘리"))
+		.andExpect(status().isOk())
+		.andExpect(content().string("Hello 둘리!!"));
+		
+	}
+	
+	@Test
+	public void testGetBoard() throws Exception {
+		ResultActions ra =  mockMvc.perform(get("/getBoard"))
+		.andExpect(status().isOk())
+		.andExpect(content().contentType(MediaType.APPLICATION_JSON))
+		.andDo(print());
+		
+		
+		String result = new String(ra.andReturn().getResponse().getContentAsByteArray());
+		BoardVO board = objectMapper.readValue(result, BoardVO.class);
+		assertEquals("테스트 제목", board.getTitle());
+	}
+}
+```
+
+위의 테스트는 testGetBoard 메서드가 실패하게 되는데 @MockBean을 주석처리하게되면 성공한다. 이는, BoardService가 @MockBean 으로 만들어 지면 빈 객체가 되기 때문이다. 그래서 when 을 이용해서 getBoard() 메서드가 호출되었을 때 title을 적절히 설정한  BoardVO 객체가 리턴되도록 해주면 테스트는 성공한다.
+
+```java
+@Test
+	public void testGetBoard() throws Exception {
+		BoardVO tmp = new BoardVO();
+		tmp.setTitle("테스트 제목");
+		when(boardService.getBoard()).thenReturn(tmp);
+		
+		ResultActions ra =  mockMvc.perform(get("/getBoard"))
+		.andExpect(status().isOk())
+		.andExpect(content().contentType(MediaType.APPLICATION_JSON))
+		.andDo(print());
+		
+		
+		String result = new String(ra.andReturn().getResponse().getContentAsByteArray());
+		BoardVO board = objectMapper.readValue(result, BoardVO.class);
+		assertEquals("테스트 제목", board.getTitle());
+	}
+```
+
+이 테스트를 작성할 때, 한글이 깨져가지고, getContentAsByteArray 를 이용해 응답의 컨텐츠를 바이트로 가져와서 문자열로 변환하는 과정을 거쳐서 한글 깨짐 문제를 해결하였다.
+
+
+
