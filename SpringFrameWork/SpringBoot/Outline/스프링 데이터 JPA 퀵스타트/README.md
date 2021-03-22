@@ -309,3 +309,139 @@ public interface BoardRepository extends CrudRepository<Board, Long> {
 아래와 같이 페이지의 정보를 볼 수 있다.
 
 ![image-20210308144030359](README.assets/image-20210308144030359.png)
+
+
+
+
+
+## Query 어노테이션 사용하기
+
+조금 복잡한 쿼리를 사용하거나, 연관관계에 기반한 조인 검색을 처리하기 위해서는 JPQL을 사용해야 한다. 또는 특정 데이터 베이스에 종속적인 네이티브 쿼리를 사용해야하는 경우에도 사용하는데 이를 위해서 제공되는 것이 @Query 어노테이션이다.
+
+
+
+```java
+public interface BoardRepository extends CrudRepository<Board, Long> {
+	Page<Board> findByTitleContaining(String content, Pageable paging);
+	
+	// JPQL이므로, 테이블 이름이 아닌, 엔티티 이름을 사용해야 한다.
+	@Query("SELECT b FROM Board b WHERE b.title like %?1% ORDER BY b.seq DESC")
+	List<Board> queryAnnotationTest1(String searchKeyword);
+}
+```
+
+주석과 같이 엔티티가 가진 이름을 이용하기 때문에 대소문자를 구분해야한다. 그리고 사용자 입력 값을 바인딩 할 수 있도록 위치 기반 파라미터와 이름 기반 파라미터 두가지를 지원한다.  '?숫자' 형식으로 사용하면 메소드의 파라미터를 의미한다. '?1' 은 메소드의 첫번째 파라미터를 의미한다.
+
+
+
+```java
+@Test
+	public void testQueryAnnotationTest1() {
+		List<Board> boardList = boardRepository.queryAnnotationTest1("10");
+		System.out.println("검색 결과");
+		for(Board board : boardList) {
+			System.out.println("--------->" + board.toString());
+		}
+	}
+```
+
+위와 같은 테스트를 작성하고 실행해보면 아래와 같은 결과를 얻을 수 있다.
+
+![image-20210322142334595](README.assets/image-20210322142334595.png)
+
+로그로 찍힌 실행된 쿼리를 확인해보자.
+
+![image-20210322142419939](README.assets/image-20210322142419939.png)
+
+적절한 쿼리가 생성되어 실행된것이 보이고, where절의 ?가 메소드의 파라미터로 바인딩되어 실행됨을 알 수 있다.
+
+
+
+위치 기반이 아닌, 이름 기반 파라미터를 사용하도록 해보자.
+
+```java
+public interface BoardRepository extends CrudRepository<Board, Long> {
+	Page<Board> findByTitleContaining(String content, Pageable paging);
+	
+	// JPQL이므로, 테이블 이름이 아닌, 엔티티 이름을 사용해야 한다.
+	@Query("SELECT b FROM Board b WHERE b.title like %:searchKeyword% ORDER BY b.seq DESC")
+	List<Board> queryAnnotationTest1(@Param("searchKeyword")String searchKeyword);
+}
+```
+
+@Param 어노테이션으로 파라미터의 이름을 지정해주고, ':파라미터 이름' 형식으로 사용하면된다. 결과는 이전과 같다.
+
+
+
+### 특정 변수만 조회하기
+
+BoardRepository에 특정 변수만 조회할 수 있는 메소드를 추가한다.
+
+엔티티 객체가 조회되는 것이 아니라 여려 변수 값들이 조회되기 때문에 조회한 결과의 row는 Object[]의 형태를 가진다.
+
+```java
+	@Query("SELECT b.seq, b.title, b.writer, b.createDate FROM Board b WHERE b.title like %?1% ORDER BY b.seq DESC")
+	List<Object[]> queryAnnotationTest2(String searchKeyword);
+```
+
+
+
+```java
+@Test
+	public void testQueryAnnotationTest2() {
+		List<Object[]> boardList = boardRepository.queryAnnotationTest2("10");
+		System.out.println("검색 결과");
+		for(Object[] row : boardList) {
+			System.out.println("--------->" + Arrays.toString(row));
+		}
+	}
+```
+
+![image-20210322143652261](README.assets/image-20210322143652261.png)
+
+테스트를 만들어 실행해보면 우리가 원하는 column만 가져와진 것을 볼 수 있다.
+
+
+
+@Query를 사용할 때 SQL이 프로젝트가 로딩되는 시점에서 파싱되어 처리된다는 걸 주의해야한다. @Query로 등록한 SQL에 오류가 있으면 예외가 발생하고 프로그램이 실행되지 않는다. 따라서 사용할 쿼리를 한번에 모두 등록하지말고 JPQL에 오류가 없는지 하나씩 확인하면서 등록해야한다.
+
+
+
+### 네이티브 쿼리 사용
+
+Repository에 다음 메소드를 추가하자.
+
+```java
+@Query(value="SELECT seq, title, writer, create_date FROM board WHERE title like '%'||?1||'%' ORDER BY seq DESC", nativeQuery=true)
+	List<Object[]> queryAnnotationTest3(String searchKeyword);
+```
+
+value에 테이블 이름을 사용하는 SQL을 지정하고, nativeQuery 속성을 true로 해주자. 문자열 접합 연산자 "||" 을 사용해 주어야 한다.
+
+createData로 Entity를 만들었지만, 실제 DB에서는 create_data로 생성되어 있기 때문에 그 이름을 사용하였다. 위와 같은 테스트를 만들고 사용 메소드만 바꿔서 실행해주면 같은 결과가 나오는 것을 볼 수 있다.
+
+
+
+@Query를 사용하더라도 Pageable 인터페이스를 동일하게 사용할 수 있다. 그리고 Sort를 이용하여 조회 결과에 대해서 정렬도 추가할 있다.
+
+```java
+@Query("SELECT b FROM Board b ORDER BY b.seq DESC")
+	List<Board> queryAnnotationTest4(Pageable paging);
+```
+
+```java
+@Test
+	public void testQueryAnnotationTest4() {
+		Pageable paging = PageRequest.of(0, 3, Sort.Direction.DESC, "seq");
+		
+		List<Board> boardList = boardRepository.queryAnnotationTest4(paging);
+		System.out.println("검색 결과");
+		for(Board board : boardList) {
+			System.out.println("--------->" + board);
+		}
+	}
+```
+
+![image-20210322145517519](README.assets/image-20210322145517519.png)
+
+Pageable에서 지정한 순서로 소팅하려면 Query 어노테이션에 지정된 SQL에서 ORDER BY 부분을 지워야한다.
